@@ -108,9 +108,7 @@ uv run main.py path/to/paper.pdf
 uv run main.py path/to/paper.pdf -o output/result.json
 ```
 
-## 在其他代码中调用
-
-### 方式一：使用完整 Pipeline
+## 在代码中调用
 
 ```python
 from literature_agent.pipeline import run
@@ -120,73 +118,4 @@ run("paper.pdf")
 
 # 指定输出路径
 run("paper.pdf", output_path="output/paper.json")
-```
-
-### 方式二：解析 PDF 后获取 Document
-
-```python
-from literature_agent.utils.pdf_reader import parse
-
-doc = parse("paper.pdf")
-print(doc.id)
-print(len(doc.blocks))   # blocks 为 dict[int, DocumentBlock]
-```
-
-### 方式三：单独使用某个 Agent
-
-```python
-from literature_agent.utils.pdf_reader import parse
-from literature_agent.utils.llm_client import get_client
-from literature_agent.agents.metadata import MetadataAgent
-
-doc = parse("paper.pdf")
-
-client = get_client()
-agent = MetadataAgent(client)
-doc = agent.run(doc)
-
-print(doc.metadata.title)
-print(doc.metadata.authors)
-```
-
-### 方式四：读写处理结果
-
-```python
-from literature_agent.utils import json_storage
-
-# 读取已处理的 JSON
-doc = json_storage.load("paper.pdf")
-# 或指定路径
-doc = json_storage.load("paper.pdf", output_path="output/paper.json")
-
-# 保存
-json_storage.save(doc, "paper.pdf")
-# 或指定路径
-json_storage.save(doc, output_path="output/result.json")
-
-# 访问处理结果
-print(doc.metadata.title)
-print(doc.structure.nodes if doc.structure else None)
-print(doc.summaries.document_summary)
-```
-
-### 方式五：作为 package 安装
-
-```bash
-# 在项目中添加依赖
-uv add --editable /path/to/read-agent
-```
-
-然后：
-
-```python
-from literature_agent.models.document import Document
-from literature_agent.agents.structure import StructureBuilder
-
-# 直接使用数据模型或构建器
-builder = StructureBuilder()
-builder.process_heading(0, "Introduction", 1)
-builder.process_heading(5, "Background", 2)
-builder.process_non_heading(6)
-print(builder.nodes)
 ```

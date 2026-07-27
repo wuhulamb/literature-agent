@@ -301,7 +301,7 @@ wheels = [
 ]
 
 [[package]]
-name = "read-agent"
+name = "literature-agent"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

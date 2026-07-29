@@ -7,7 +7,6 @@ from .document import (
     SectionNode,
     DocumentSummary,
     ProcessingState,
-    DocumentType,
     Language,
     Page,
 )
@@ -21,7 +20,6 @@ __all__ = [
     "SectionNode",
     "DocumentSummary",
     "ProcessingState",
-    "DocumentType",
     "Language",
     "Page",
 ]

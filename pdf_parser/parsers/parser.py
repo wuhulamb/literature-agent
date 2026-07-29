@@ -13,7 +13,7 @@ def _extract_text_block(page_id: int, block_id: int, global_id_start: int, raw: 
     for line in lines:
         for span in line["spans"]:
             text_parts.append(span["text"])
-    full_text = "".join(text_parts)
+    full_text = " ".join(text_parts)
 
     tb = TextBlock(
         id=global_id_start,

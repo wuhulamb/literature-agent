@@ -10,13 +10,6 @@ class Language(str, Enum):
     JA = "ja"
 
 
-class DocumentType(str, Enum):
-    ACADEMIC_PAPER = "academic_paper"
-    BOOK = "book"
-    REPORT = "report"
-    ARTICLE = "article"
-
-
 class Page(BaseModel):
     page_number: int
     text: str
@@ -26,6 +19,9 @@ class DocumentBlock(BaseModel):
     id: int
     text: str
     page: int | None = None
+    is_heading: bool = False
+    heading_title: str | None = None
+    heading_level: int | None = None
 
 
 class SectionNode(BaseModel):
@@ -48,9 +44,8 @@ class DocumentMetadata(BaseModel):
     title: str | None = None
     authors: list[str] = []
     year: int | None = None
-    source: str | None = None
+    journal: str | None = None
     language: Language | None = None
-    document_type: DocumentType | None = None
 
 
 class DocumentContent(BaseModel):

@@ -4,34 +4,55 @@ from literature_agent.agents.base import BaseAgent
 from literature_agent.models.document import Document, DocumentBlock, DocumentSummary
 
 
-_SECTION_SUMMARY_PROMPT = """You are an academic paper summarizer. Summarize the following section of a research paper.
+_SUMMARY_SYSTEM_PROMPT = """You are an expert academic paper summarizer.
 
-Section title: {title}
+Output language:
+- Simplified Chinese.
 
-Provide a concise summary (2-4 sentences) that captures the key points of this section.
+Writing style:
+- Accurate.
+- Concise.
+- Objective.
+- Academic.
+
+Terminology:
+- Keep technical terms, model names, benchmark names, dataset names,
+  mathematical symbols, and abbreviations in their original language
+  whenever appropriate.
+
+Never fabricate information."""
+
+
+_SECTION_SUMMARY_PROMPT = """Summarize the following section of a research paper.
+
+Section title:
+{title}
+
+Write a concise summary in 2-4 sentences.
 
 Text:
 {text}"""
 
 
-_PARENT_SUMMARY_PROMPT = """You are an academic paper summarizer. Synthesize the following sub-sections into a concise summary (2-4 sentences) of the parent section.
+_PARENT_SUMMARY_PROMPT = """Synthesize the following subsection summaries into a concise summary of the parent section.
 
-Section title: {title}
+Section title:
+{title}
 
 Sub-section summaries:
 {sub_summaries}
 
-Additional content from this section:
+Additional content:
 {additional_text}"""
 
 
-_DOCUMENT_SUMMARY_PROMPT = """You are an academic paper summarizer. Write a concise summary of the entire paper (4-6 sentences) based on its section summaries.
+_DOCUMENT_SUMMARY_PROMPT = """Write a concise summary of the entire paper in 4-6 sentences.
 
 Section summaries:
 {section_summaries}"""
 
 
-_ONE_SENTENCE_PROMPT = """You are an academic paper summarizer. Condense the following paper summary into a single sentence that captures the core contribution.
+_ONE_SENTENCE_PROMPT = """Summarize the paper in one sentence.
 
 Paper summary:
 {document_summary}"""
@@ -120,6 +141,9 @@ class SummaryAgent(BaseAgent):
     def _call_llm(self, prompt: str) -> str:
         completion = self._client.chat.completions.create(
             model="ecnu-max",
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": _SUMMARY_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
         )
         return completion.choices[0].message.content or ""

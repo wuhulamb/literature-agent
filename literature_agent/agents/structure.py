@@ -19,46 +19,146 @@ class BatchHeadingResult(BaseModel):
     annotations: list[BlockHeadingAnnotation]
 
 
-_HEADING_DETECTOR_PROMPT = """You are a document structure analyzer. Given a list of text blocks from an academic paper, identify which blocks are section headings.
+_HEADING_DETECTOR_PROMPT = """
+## role
 
-The input contains:
-1. "existing_headings": Headings that have already been confirmed in previous batches. If a block's text is identical or very similar to an existing heading title, it is almost certainly NOT a new heading — mark it as is_heading=false. Do NOT create duplicate headings.
-2. "blocks": The current batch of text blocks to analyze.
+You are an academic document structure analyzer.
 
-For each block in "blocks", determine:
-1. is_heading: Whether this block is a section heading.
-2. title: If it's a heading, the heading text (usually the same as the block text).
-3. level: The heading level.
-   - level 1 = top-level sections (Introduction, Method, Results, etc.)
-   - level 2 = subsections
-   - level 3 = sub-subsections, and so on
+You are part of a multi-stage document parsing pipeline.
 
-A valid section heading must satisfy ALL of the following:
+A previous agent has already extracted the document metadata, including the paper title.
 
-1. It introduces a structural section of the paper.
-2. The following paragraphs belong to that section until another heading appears.
-3. It fits naturally into the paper hierarchy.
+The paper title has already been identified and stored separately. It is NOT part of your task.
 
-These are NOT section headings (is_heading=false):
-- Journal name, publisher name, or venue name (e.g. "Research Policy", "Nature", "Science")
-- Page headers, footers, or running headers (e.g. author names repeated at top of page)
-- Figure/Table captions
+Your responsibility is to identify structural section headings within the document body and infer their hierarchy.
+
+Do not attempt to identify the paper title, author information, affiliations, abstracts, keywords, or other metadata. Focus only on headings that define the logical structure of the paper.
+
+## Input
+
+The input is a JSON object with the following fields:
+
+### existing_headings
+
+A list of structural headings that have already been confirmed in previous batches.
+
+Each heading includes its id, title, and hierarchy level.
+
+### blocks
+
+The current batch of text blocks to analyze.
+
+Each block contains an id and its extracted text.
+
+## Task
+
+Your task is to analyze each text block in the input batch and determine whether it represents or starts with a structural section heading.
+
+For each block, you must output an annotation containing the following three fields:
+
+1. **is_heading**
+   A boolean flag indicating whether the block contains or starts with a structural section heading.
+
+2. **title**
+   The extracted text of the section heading.
+   - If `is_heading` is `true`, return only the heading text.
+   - If `is_heading` is `false`, return `null`.
+
+3. **level**
+   An integer representing the hierarchical level of the structural section heading.
+   - **Level 1**: Top-level major sections (e.g., "1 Introduction", "Methods", "Discussion", "Conclusion")
+   - **Level 2**: Subsections (e.g., "2.1 Background", "3.2 Model Specification")
+   - **Level 3+**: Deeper nested sub-subsections (e.g., "3.1.1 Data Collection")
+   - If `is_heading` is `false`, return `null`.
+
+## Decision Rules
+
+A valid structural section heading must satisfy ALL of the following:
+
+1. It introduces a new structural section, and the following content belongs to that section until another heading appears.
+
+2. It fits naturally into the document hierarchy and is neither the document title nor an exact duplicate of an existing heading.
+
+3. Any standalone section number pattern such as "1", "1.1", "1.1.1", "第3章", "III." followed by title-like text should be treated as a structural heading even when it is embedded within a paragraph due to OCR line merging.
+
+4. A structural heading may appear at the beginning or anywhere inside a block due to OCR or page merging. Ignore any residual body text before the heading.
+
+5. If a numbered section heading (e.g. "2", "2.1", "3.3", "III.", "第3章") appears in a block and is followed by section content, treat it as a structural heading. Extract ONLY the heading text.
+
+6. If a block contains both a heading and body text, return only the heading and ignore the surrounding body text.
+
+7. Infer the hierarchy level from the heading numbering whenever possible (e.g. "2" → Level 1, "2.1" → Level 2, "2.1.1" → Level 3).
+
+## Common Non-Headings
+
+The following are NOT section headings:
+
+- Paper title or any part of the paper title
+- Author names, affiliations, or correspondence information
+- Journal, publisher, or venue names (e.g. "Research Policy", "Nature", "Science")
 - Abstract
 - Keywords
-- JEL codes, JEL classification
-- Article info, Received/Accepted/Published dates
+- JEL codes or classification codes
+- Article metadata (e.g. DOI, received/accepted/published dates)
+- Page headers, page footers, or running headers
+- Figure or table captions
 
-These ARE section headings (is_heading=true, level=1):
-- Introduction, Method, Results, Discussion, Conclusion
-- References, Bibliography
-- Acknowledgements or Acknowledgments
-- Appendix or Appendix A, Appendix B, etc.
-- Supplementary material or Supplementary information
-- Data availability or Data availability statement
-- CRediT authorship contribution statement
-- Declaration of competing interest
+## Common Headings
+
+Common section headings include, but are not limited to:
+
+- Numbered sections (e.g. "I. Introduction", "2 Methods", "3.1 Data")
+- Introduction
+- Background
+- Related Work
+- Methods or Methodology
+- Results
+- Discussion
+- Conclusion
+- References or Bibliography
+- Acknowledgements
+- Appendix
+- Supplementary Material
+- Data Availability Statement
+- CRediT Authorship Contribution Statement
+- Declaration of Competing Interest
+
+## Examples
+
+Input block:
+
+4.1 模型与变量设定 为识别促进和阻碍中国与世界市场建立产业联系的动力……
+
+Output:
+
+is_heading = true
+title = "4.1 模型与变量设定"
+level = 2
+
+Input block:
+
+3.2 Model Specification We estimate the following regression...
+
+Output:
+
+is_heading = true
+title = "3.2 Model Specification"
+level = 2
+
+Input block:
+
+欧社群（瑞典—丹麦—芬兰）。 3.3   中国在中国—世界产业联系网络中的角色与地位演变 本文进一步从影响力……
+
+Output:
+
+is_heading = true
+title = "3.3 中国在中国—世界产业联系网络中的角色与地位演变"
+level = 2
+
+## Output
 
 Return ONLY a JSON object matching this schema:
+
 {
   "annotations": [
     {
@@ -100,6 +200,7 @@ class StructureBuilder:
             title=title,
             level=level,
             parent_id=parent_id,
+            block_ids=[block_id],
         )
         self.next_id += 1
 
@@ -165,6 +266,7 @@ class StructureAgent(BaseAgent):
                 {"id": n.id, "title": n.title, "level": n.level}
                 for n in builder.nodes.values()
             ]
+            print(existing)
 
             payload = {
                 "existing_headings": existing,
@@ -186,10 +288,27 @@ class StructureAgent(BaseAgent):
             )
 
             result = completion.choices[0].message.parsed
-            if result is None:
-                continue
 
-            for ann in result.annotations:
+            # Map LLM annotations by block_id
+            ann_by_id = {}
+            if result is not None:
+                for ann in result.annotations:
+                    ann_by_id[ann.block_id] = ann
+
+            # Iterate over input batch order, fill missing annotations with default
+            batch_block_ids = [b.id for b in batch]
+            for block_id in batch_block_ids:
+                ann = ann_by_id.get(block_id)
+                if ann is None:
+                    ann = BlockHeadingAnnotation(block_id=block_id, is_heading=False)
+
+                # Persist heading annotation back to the block
+                block = document.blocks.get(block_id)
+                if block is not None:
+                    block.is_heading = ann.is_heading
+                    block.heading_title = ann.title
+                    block.heading_level = ann.level
+
                 if ann.is_heading and ann.title and ann.level is not None:
                     title_lower = ann.title.lower().strip()
                     if title_lower in existing_titles:

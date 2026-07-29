@@ -10,9 +10,8 @@ Rules:
 - title: The paper's full title. If unclear, return null.
 - authors: List of author names as they appear. If none found, return empty list.
 - year: The publication year as a 4-digit integer. If unclear, return null.
-- source: The journal, conference, or venue name. If unclear, return null.
+- journal: The journal or venue name. If unclear, return null.
 - language: One of "en" (English), "zh" (Chinese), "ja" (Japanese). Default to "en" if not obvious.
-- document_type: One of "academic_paper", "book", "report", "article". Default to "academic_paper" if not obvious.
 
 Respond with ONLY valid raw JSON. No markdown, no code fences, no explanation. Do not wrap the response in ```json or any other tags. If a field cannot be determined from the text, set it to null (or empty list for authors)."""
 

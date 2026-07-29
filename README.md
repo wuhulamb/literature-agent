@@ -112,10 +112,14 @@ uv run main.py path/to/paper.pdf -o output/result.json
 
 ```python
 from literature_agent.pipeline import run
+from literature_agent.models.document import Document
 
-# 直接运行完整流程
-run("paper.pdf")
+# 返回 Document 对象（JSON 同时写入磁盘）
+doc: Document = run("paper.pdf", output_path="output/paper.json")
 
-# 指定输出路径
-run("paper.pdf", output_path="output/paper.json")
+# 访问处理结果
+print(doc.metadata.title)                   # 标题
+print(doc.metadata.authors)                 # 作者列表
+print(f"章节数: {len(doc.structure.nodes)}") # 章节树节点数
+print(f"一句话摘要: {doc.summaries.one_sentence_summary}")
 ```

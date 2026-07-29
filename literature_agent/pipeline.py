@@ -6,9 +6,10 @@ from literature_agent.utils import json_storage
 from literature_agent.agents.metadata import MetadataAgent
 from literature_agent.agents.structure import StructureAgent
 from literature_agent.agents.summary import SummaryAgent
+from literature_agent.models.document import Document
 
 
-def run(pdf_path: str, output_path: str | None = None) -> None:
+def run(pdf_path: str, output_path: str | None = None) -> Document:
     doc = json_storage.load(pdf_path, output_path)
 
     if doc is None:
@@ -52,3 +53,4 @@ def run(pdf_path: str, output_path: str | None = None) -> None:
     doc.processing.last_updated = datetime.now()
     out_path = json_storage.save(doc, pdf_path, output_path)
     print(f"[pipeline] Done. Document saved to {out_path}")
+    return doc

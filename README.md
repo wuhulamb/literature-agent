@@ -6,12 +6,13 @@
 
 ```
 .
-├── main.py                          # 入口脚本
+├── main.py                          # CLI 入口脚本
 ├── pyproject.toml                   # 项目配置
 ├── pdf_parser/                      # PDF 解析模块（独立子模块）
 │
 └── literature_agent/                # 核心代码
-    ├── pipeline.py                  # 流程编排（串联各 Agent 执行）
+    ├── pipeline.py                  # 流程编排 + checkpoint 钩子
+    ├── storage.py                   # JSON 读写（内置 storage 实现）
     ├── models/
     │   └── document.py              # 核心数据模型 Document
     ├── agents/
@@ -21,19 +22,18 @@
     │   └── summary.py               # SummaryAgent — 层次化总结
     └── utils/
         ├── llm_client.py            # LLM 客户端（配置 API）
-        ├── pdf_reader.py            # PDF 解析封装（依赖 pdf_parser）
-        └── json_storage.py          # Document 的 JSON 读写
+        └── pdf_reader.py            # PDF 解析封装（依赖 pdf_parser）
 ```
 
 ### Pipeline 流程
 
 ```
-PDF → PDF 解析 (content + blocks) → 元数据提取 (metadata)
+PDF bytes → PDF 解析 (content + blocks) → 元数据提取 (metadata)
      → 章节结构构建 (structure) → 层次化总结 (summaries)
-     → 输出 JSON
+     → Document 对象
 ```
 
-每一步完成后保存 checkpoint，支持断点续跑（通过 `Document.processing` 状态判断）。
+Pipeline 在每个步骤完成后触发 checkpoint 钩子。`ProcessingState` 记录完成状态，调用方通过 `document` 参数传入已有状态，Pipeline 自动跳过已完成步骤。
 
 ### 核心数据模型
 
@@ -41,8 +41,7 @@ PDF → PDF 解析 (content + blocks) → 元数据提取 (metadata)
 
 | 字段 | 类型 | 说明 | 由谁填充 |
 |------|------|------|----------|
-| `id` | `str` | UUID | 解析时生成 |
-| `path` | `str` | PDF 绝对路径 | 解析时生成 |
+| `id` | `str` | PDF 内容 SHA256 | 解析时生成 |
 | `content` | `DocumentContent` | 全文文本和分页 | `pdf_reader` |
 | `blocks` | `dict[int, DocumentBlock]` | 文本块字典（id → block） | `pdf_reader` |
 | `metadata` | `DocumentMetadata` | 标题/作者/年份等 | `MetadataAgent` |
@@ -57,30 +56,6 @@ PDF → PDF 解析 (content + blocks) → 元数据提取 (metadata)
 | **MetadataAgent** | 前 2 页文本 | `DocumentMetadata` | 单次 LLM 调用，`response_format` 结构化提取 |
 | **StructureAgent** | `Document.blocks` | `DocumentStructure` | 两步：LLM 标题检测 → Python 栈构建章节树 |
 | **SummaryAgent** | `SectionNode` 树 | `DocumentSummary` | 自底向上后序遍历，逐层调用 LLM |
-
-#### StructureAgent 细节
-
-分为两步：
-
-1. **HeadingDetector（LLM）**：判断每个 block 是否为章节标题，返回 `(block_id, is_heading, title, level)`
-2. **StructureBuilder（Python）**：用栈维护当前章节层级，逐步构建 `SectionNode` 树
-
-构建过程：
-
-```
-根节点（level=0）：文献标题（由 MetadataAgent 提供）
-  │
-  ├─ heading(level=1) → push（如 Introduction、Method）
-  │    └─ heading(level=2) → push（子章节，如 2.1 Background）
-  │         └─ block → 加入栈顶 section 的 block_ids
-  │
-  ├─ heading(level=1) → pop 到 level < 1，push（同级新章节）
-  │    └─ block → 加入栈顶 section 的 block_ids
-  │
-  └─ ...
-```
-
-去重机制：通过 `existing_titles` 集合记录已存在的标题，LLM 误判的重复标题自动降级为 non-heading block。
 
 ## 快速开始
 
@@ -111,11 +86,21 @@ uv run main.py path/to/paper.pdf -o output/result.json
 ## 在代码中调用
 
 ```python
+from pathlib import Path
 from literature_agent.pipeline import run
-from literature_agent.models.document import Document
+from literature_agent.storage import save as save_json, load as load_json
 
-# 返回 Document 对象（JSON 同时写入磁盘）
-doc: Document = run("paper.pdf", output_path="output/paper.json")
+# 首次处理
+pdf_bytes = Path("paper.pdf").read_bytes()
+doc = run(pdf_bytes, checkpoint=lambda d: print(f"Step done: {d.id}"))
+
+# 从 checkpoint 恢复
+saved = load_json("paper.pdf", "paper.document.json")
+doc = run(pdf_bytes, document=saved, checkpoint=save_json)
+
+# 重新生成摘要（将 summary_done 重置后传入）
+saved.processing.summary_done = False
+doc = run(pdf_bytes, document=saved, checkpoint=save_json)
 
 # 访问处理结果
 print(doc.metadata.title)                   # 标题
@@ -123,3 +108,20 @@ print(doc.metadata.authors)                 # 作者列表
 print(f"章节数: {len(doc.structure.nodes)}") # 章节树节点数
 print(f"一句话摘要: {doc.summaries.one_sentence_summary}")
 ```
+
+## Pipeline API
+
+```python
+def run(
+    pdf_bytes: bytes,
+    document: Document | None = None,
+    *,
+    checkpoint: Callable[[Document], None] = lambda _: None,
+) -> Document
+```
+
+| 参数 | 说明 |
+|------|------|
+| `pdf_bytes` | PDF 原始字节 |
+| `document` | 已有 Document 状态，用于断点续跑。None 表示全新处理 |
+| `checkpoint` | 每步完成后调用的回调，默认 no-op。用于持久化当前进度 |

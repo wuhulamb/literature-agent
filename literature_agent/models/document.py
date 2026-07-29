@@ -70,7 +70,6 @@ class DocumentSummary(BaseModel):
 
 class Document(BaseModel):
     id: str
-    path: str
     metadata: DocumentMetadata = DocumentMetadata()
     content: DocumentContent = DocumentContent()
     blocks: dict[int, DocumentBlock] = {}

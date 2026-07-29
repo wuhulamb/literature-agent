@@ -1,22 +1,41 @@
 from datetime import datetime
+from collections.abc import Callable
 
 from literature_agent.utils.pdf_reader import parse
 from literature_agent.utils.llm_client import get_client
-from literature_agent.utils import json_storage
 from literature_agent.agents.metadata import MetadataAgent
 from literature_agent.agents.structure import StructureAgent
 from literature_agent.agents.summary import SummaryAgent
 from literature_agent.models.document import Document
 
 
-def run(pdf_path: str, output_path: str | None = None) -> Document:
-    doc = json_storage.load(pdf_path, output_path)
+def run(
+    pdf_bytes: bytes,
+    document: Document | None = None,
+    *,
+    checkpoint: Callable[[Document], None] = lambda _: None,
+) -> Document:
+    """Process PDF bytes through the pipeline.
 
-    if doc is None:
+    Args:
+        pdf_bytes: Raw PDF content.
+        document: Existing document to resume from. If None, a new document is
+                  created by parsing the PDF. Completed steps (based on
+                  ProcessingState) are skipped.
+        checkpoint: Hook called after each completed step with the current
+                    document. No-op by default.
+
+    Returns:
+        Fully processed Document with ProcessingState marking completion.
+    """
+    if document is None:
         print("[pipeline] Parsing PDF...")
-        doc = parse(pdf_path)
+        doc = parse(pdf_bytes)
         print(f"  -> id: {doc.id}")
         print(f"  -> blocks: {len(doc.blocks)}, pages: {len(doc.content.pages) if doc.content.pages else 0}")
+    else:
+        doc = document
+        print(f"[pipeline] Resuming document {doc.id}...")
 
     client = get_client()
 
@@ -26,7 +45,7 @@ def run(pdf_path: str, output_path: str | None = None) -> Document:
         doc = agent.run(doc)
         doc.processing.meta_done = True
         print(f"  -> title: {doc.metadata.title}")
-        json_storage.save(doc, pdf_path, output_path)
+        checkpoint(doc)
     else:
         print("[pipeline] Metadata already done, skipping.")
 
@@ -37,7 +56,7 @@ def run(pdf_path: str, output_path: str | None = None) -> Document:
         doc.processing.structure_done = True
         node_count = len(doc.structure.nodes) if doc.structure else 0
         print(f"  -> section nodes: {node_count}")
-        json_storage.save(doc, pdf_path, output_path)
+        checkpoint(doc)
     else:
         print("[pipeline] Structure already done, skipping.")
 
@@ -47,10 +66,9 @@ def run(pdf_path: str, output_path: str | None = None) -> Document:
         doc = agent.run(doc)
         doc.processing.summary_done = True
         print(f"  -> document_summary: {'done' if doc.summaries.document_summary else 'none'}")
+        checkpoint(doc)
     else:
         print("[pipeline] Summaries already done, skipping.")
 
     doc.processing.last_updated = datetime.now()
-    out_path = json_storage.save(doc, pdf_path, output_path)
-    print(f"[pipeline] Done. Document saved to {out_path}")
     return doc

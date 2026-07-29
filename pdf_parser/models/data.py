@@ -31,6 +31,6 @@ class Page(BaseModel):
 
 class Document(BaseModel):
     """PDF 文档，包含所有页面"""
-    path: str
+    path: str = ""
     pages: list[Page]
     total_pages: int

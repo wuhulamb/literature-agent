@@ -1,5 +1,4 @@
-from pathlib import Path
-from uuid import uuid4
+from hashlib import sha256
 
 from pdf_parser.parsers import parse_pdf
 from pdf_parser.models import TextBlock as RawTextBlock
@@ -12,10 +11,9 @@ from literature_agent.models.document import (
 )
 
 
-def parse(pdf_path: str) -> Document:
-    """Parse a PDF file and return a Document with content and blocks populated."""
-    raw_doc = parse_pdf(pdf_path)
-    pdf_path_obj = Path(pdf_path)
+def parse(pdf_bytes: bytes) -> Document:
+    """Parse PDF bytes and return a Document with content and blocks populated."""
+    raw_doc = parse_pdf(pdf_bytes)
 
     full_text_parts: list[str] = []
     pages: list[Page] = []
@@ -38,8 +36,7 @@ def parse(pdf_path: str) -> Document:
         full_text_parts.append(page_text)
 
     return Document(
-        id=str(uuid4()),
-        path=str(pdf_path_obj.resolve()),
+        id=sha256(pdf_bytes).hexdigest(),
         content=DocumentContent(
             full_text="\n\n".join(full_text_parts),
             pages=pages,

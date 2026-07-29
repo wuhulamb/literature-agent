@@ -58,9 +58,14 @@ def _extract_page(page_id: int, raw_page, global_id_start: int) -> tuple[Page, i
     return Page(id=page_id, blocks=blocks), next_id
 
 
-def parse_pdf(path: str) -> Document:
+def parse_pdf(path: str | bytes) -> Document:
     """解析 PDF 文件，返回 Document 模型"""
-    doc = pymupdf.open(path)
+    if isinstance(path, bytes):
+        doc = pymupdf.open(stream=path, filetype="pdf")
+        source = ""
+    else:
+        doc = pymupdf.open(path)
+        source = path
     pages: list[Page] = []
     global_id = 0
 
@@ -70,7 +75,7 @@ def parse_pdf(path: str) -> Document:
         pages.append(page)
 
     result = Document(
-        path=path,
+        path=source,
         pages=pages,
         total_pages=len(doc),
     )

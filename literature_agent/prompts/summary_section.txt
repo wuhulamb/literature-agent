@@ -1,0 +1,9 @@
+Summarize the following section of a research paper.
+
+Section title:
+{title}
+
+Write a concise summary in 2-4 sentences.
+
+Text:
+{text}

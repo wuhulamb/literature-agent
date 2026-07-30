@@ -1,0 +1,10 @@
+Synthesize the following subsection summaries into a concise summary of the parent section.
+
+Section title:
+{title}
+
+Sub-section summaries:
+{sub_summaries}
+
+Additional content:
+{additional_text}

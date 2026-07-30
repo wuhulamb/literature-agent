@@ -1,0 +1,4 @@
+Summarize the paper in one sentence.
+
+Paper summary:
+{document_summary}

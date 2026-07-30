@@ -2,60 +2,14 @@ from openai import OpenAI
 
 from literature_agent.agents.base import BaseAgent
 from literature_agent.models.document import Document, DocumentBlock, DocumentSummary
+from literature_agent.prompts import load_prompt
 
 
-_SUMMARY_SYSTEM_PROMPT = """You are an expert academic paper summarizer.
-
-Output language:
-- Simplified Chinese.
-
-Writing style:
-- Accurate.
-- Concise.
-- Objective.
-- Academic.
-
-Terminology:
-- Keep technical terms, model names, benchmark names, dataset names,
-  mathematical symbols, and abbreviations in their original language
-  whenever appropriate.
-
-Never fabricate information."""
-
-
-_SECTION_SUMMARY_PROMPT = """Summarize the following section of a research paper.
-
-Section title:
-{title}
-
-Write a concise summary in 2-4 sentences.
-
-Text:
-{text}"""
-
-
-_PARENT_SUMMARY_PROMPT = """Synthesize the following subsection summaries into a concise summary of the parent section.
-
-Section title:
-{title}
-
-Sub-section summaries:
-{sub_summaries}
-
-Additional content:
-{additional_text}"""
-
-
-_DOCUMENT_SUMMARY_PROMPT = """Write a concise summary of the entire paper in 4-6 sentences.
-
-Section summaries:
-{section_summaries}"""
-
-
-_ONE_SENTENCE_PROMPT = """Summarize the paper in one sentence.
-
-Paper summary:
-{document_summary}"""
+_SUMMARY_SYSTEM_PROMPT = load_prompt("summary_system")
+_SECTION_SUMMARY_PROMPT = load_prompt("summary_section")
+_PARENT_SUMMARY_PROMPT = load_prompt("summary_parent")
+_DOCUMENT_SUMMARY_PROMPT = load_prompt("summary_document")
+_ONE_SENTENCE_PROMPT = load_prompt("summary_one_sentence")
 
 
 class SummaryAgent(BaseAgent):

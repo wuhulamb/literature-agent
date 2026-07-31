@@ -15,13 +15,17 @@ class Page(BaseModel):
     text: str
 
 
+class BlockHeading(BaseModel):
+    title: str
+    level: int
+
+
 class DocumentBlock(BaseModel):
     id: int
     text: str
     page: int | None = None
     is_heading: bool = False
-    heading_title: str | None = None
-    heading_level: int | None = None
+    headings: list[BlockHeading] = []
 
 
 class SectionNode(BaseModel):
